@@ -5,6 +5,7 @@ const mysql = require("mysql2");
 const app = express();
 
 app.use(cors());
+app.use(express.json()); // permet d'envoyer et recevoir du JSON
 
 const connexion = mysql.createConnection({
   host: "localhost",
@@ -21,8 +22,6 @@ connexion.connect((err) => {
   console.log("Connecté à la base de données SQL");
 });
 
-app.use(express.json()); // permet d'envoyer et recevoir du JSON
-
 // On place un callback, la fonction qui sera appelé lorsque l'utilisateur accède a la route indiqué
 app.get("/user/list", (req, res) => {
   // L ORDRE DES PARAMS EST IMPORTANT
@@ -35,6 +34,17 @@ app.get("/user/list", (req, res) => {
   ];
 
   res.json(users);
+});
+
+app.get("/", (req, res) => {
+  res.send("<h1>C'est une API</h1>");
+});
+
+app.post("/product", (req, res) => {
+  const product = req.body;
+  console.log(req.body);
+
+  res.json(product);
 });
 
 app.get("/product/list", (req, response) => {
