@@ -42,16 +42,35 @@ app.get("/", (req, res) => {
 
 app.post("/product", (req, res) => {
   const product = req.body;
-  console.log(req.body);
 
-  res.json(product);
+  // Validation
+  if (product.nom == null || product.nom == "" || product.nom.length > 20 || product.description.length > 50) {
+    return res.sendStatus(400); // Bad request
+  }
+
+  // Verification si le nom du produit existe déjà
+  connexion.query("SELECT * FROM product WHERE name = ?", [product.nom], (err, line) => {
+    if (line.length > 0) {
+      return res.sendStatus(409); // Conflict
+    }
+
+    connexion.query("INSERT INTO product (name, description) VALUES (?, ?)", [product.nom, product.description], (err, line) => {
+      if (err) {
+        console.log(err);
+        return res.sendStatus(500); // Internal Server error
+      }
+      res.status(201).json(product); // Created
+    });
+  });
+
+  // Ici c'est l'ordre de déclaration qui prime, il n'y a pas de cohérence entre les noms
 });
 
 app.get("/product/list", (req, response) => {
   connexion.query("SELECT * FROM product", (err, item) => {
     if (err) {
       console.error(err);
-      return res.serverStatus(500);
+      return res.serverStatus(500); // Internal Server error
     }
 
     return response.json(item);
