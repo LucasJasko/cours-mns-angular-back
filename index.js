@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2");
+const bcrypt = require("bcrypt");
+const jwtUtils = require("jsonwebtoken");
 
 const app = express();
 
@@ -14,6 +16,7 @@ const connexion = mysql.createConnection({
   database: "projet-angular",
 });
 
+// On place un callback, la fonction qui sera appelé lorsque l'utilisateur accède a la route indiqué
 connexion.connect((err) => {
   if (err) {
     console.error("Erreur de conexion à la base de données :", err);
@@ -22,7 +25,6 @@ connexion.connect((err) => {
   console.log("Connecté à la base de données SQL");
 });
 
-// On place un callback, la fonction qui sera appelé lorsque l'utilisateur accède a la route indiqué
 app.get("/user/list", (req, res) => {
   // L ORDRE DES PARAMS EST IMPORTANT
   // La méthode send permet de renvoyer quelque chose au client
@@ -70,14 +72,53 @@ app.get("/product/list", (req, response) => {
   connexion.query("SELECT * FROM product", (err, item) => {
     if (err) {
       console.error(err);
-      return res.serverStatus(500); // Internal Server error
+      return res.send(500); // Internal Server error
     }
 
     return response.json(item);
   });
 });
 
-port = 5000;
-app.listen(port, () => {
-  console.log("Le serveur écoute sur le port", port);
+app.post("/inscription", (req, res) => {
+  const user = req.body;
+  const passwordHash = bcrypt.hashSync(user.password, 10);
+  connexion.query("INSERT INTO user (email, password) VALUES (?, ?)", [user.email, passwordHash], (err, line) => {
+    if (err && err.code == "ER_DUP_ENTRY") {
+      return res.sendStatus(409); // Conflit
+    }
+
+    if (err) {
+      return res.sendStatus(500);
+    }
+
+    user.id = res.insertId;
+    res.json(user);
+  });
+});
+
+app.post("/connexion", (req, res) => {
+  connexion.query("SELECT * FROM user WHERE email = ?", [req.body.email], (err, line) => {
+    if (err) {
+      console.log(err);
+      return res.sendStatus(500);
+    }
+
+    if (line.length === 0) {
+      return res.sendStatus(401);
+    }
+
+    const formPassword = req.body.password;
+    const fetchPassword = line[0].password;
+
+    const compatible = bcrypt.compareSync(formPassword, fetchPassword);
+
+    if (!compatible) {
+      return res.sendStatus(401);
+    }
+    return res.send(jwtUtils.sign({ sub: req.body.email }, "azerty123"));
+  });
+});
+
+app.listen(5000, () => {
+  console.log("Le serveur écoute sur le port", 5000);
 });
