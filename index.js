@@ -3,6 +3,7 @@ const cors = require("cors");
 const mysql = require("mysql2");
 const bcrypt = require("bcrypt");
 const jwtUtils = require("jsonwebtoken");
+const interceptor = require("./middleware/jwt-interceptor");
 
 const app = express();
 
@@ -27,7 +28,6 @@ connexion.connect((err) => {
 
 app.get("/user/list", (req, res) => {
   // L ORDRE DES PARAMS EST IMPORTANT
-  // La méthode send permet de renvoyer quelque chose au client
 
   const users = [
     { id: 1, email: "luc@yahoo.fr" },
@@ -39,10 +39,11 @@ app.get("/user/list", (req, res) => {
 });
 
 app.get("/", (req, res) => {
+  // La méthode send permet de renvoyer quelque chose au client
   res.send("<h1>C'est une API</h1>");
 });
 
-app.post("/product", (req, res) => {
+app.post("/product", interceptor, (req, res) => {
   const product = req.body;
 
   // Validation
