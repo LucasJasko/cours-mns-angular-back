@@ -61,7 +61,7 @@ app.post("/product", interceptor, (req, res) => {
       return res.sendStatus(409); // Conflict
     }
 
-    connexion.query("INSERT INTO product (name, description) VALUES (?, ?)", [product.nom, product.description], (err, line) => {
+    connexion.query("INSERT INTO product (name, description, id_creator) VALUES (?, ?, ?)", [product.nom, product.description, req.user.id], (err, line) => {
       if (err) {
         console.log(err);
         return res.sendStatus(500); // Internal Server error
@@ -81,6 +81,40 @@ app.get("/product/list", (req, response) => {
     }
 
     return response.json(item);
+  });
+});
+
+app.delete("/product/:id", interceptor, (req, res) => {
+  // On récupère le produit
+  connexion.query("SELECT * FROM product WHERE id = ?", [req.params.id], (err, lines) => {
+    // Si il y a une erreur
+    if (err) {
+      console.error(err);
+      return res.sendStatus(500);
+    }
+
+    // Si le produit est inconnu
+    if (lines.length == 0) {
+      return res.sendStatus(404);
+    }
+
+    // SI l'utilisateur est connecté et utilisateur
+    const isOwner = req.user.role == "vendeur" && req.user.id == lines[0].id_creator;
+
+    // Si il n'est ni propriétaire du produit et administrateur
+    if (!isOwner && req.user.role != "administrateur") {
+      return res.sendStatus(403);
+    }
+
+    // On supprime le produit
+    connexion.query("DELETE FROM product WHERE id = ?", [req.params.id], (err, lines) => {
+      if (err) {
+        console.error(err);
+        return res.sendStatus(500);
+      }
+
+      return res.sendStatus(204);
+    });
   });
 });
 
@@ -110,18 +144,18 @@ app.post("/connexion", (req, res) => {
     WHERE email = ?
     `,
     [req.body.email],
-    (err, line) => {
+    (err, lines) => {
       if (err) {
         console.log(err);
         return res.sendStatus(500);
       }
 
-      if (line.length === 0) {
+      if (lines.length === 0) {
         return res.sendStatus(401);
       }
 
       const formPassword = req.body.password;
-      const fetchPassword = line[0].password;
+      const fetchPassword = lines[0].password;
 
       const compatible = bcrypt.compareSync(formPassword, fetchPassword);
 
@@ -132,7 +166,8 @@ app.post("/connexion", (req, res) => {
         jwtUtils.sign(
           {
             sub: req.body.email,
-            role: line[0].name,
+            role: lines[0].name,
+            id: lines[0].id,
           },
           "azerty123"
         )
