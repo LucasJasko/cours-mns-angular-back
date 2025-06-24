@@ -46,8 +46,12 @@ app.get("/", (req, res) => {
 app.post("/product", interceptor, (req, res) => {
   const product = req.body;
 
-  // Validation
+  if (req.user.role != "vendeur" && req.user.role != "administrateur") {
+    return res.sendStatus(403);
+  }
+
   if (product.nom == null || product.nom == "" || product.nom.length > 20 || product.description.length > 50) {
+    // Validation
     return res.sendStatus(400); // Bad request
   }
 
@@ -83,7 +87,7 @@ app.get("/product/list", (req, response) => {
 app.post("/inscription", (req, res) => {
   const user = req.body;
   const passwordHash = bcrypt.hashSync(user.password, 10);
-  connexion.query("INSERT INTO user (email, password) VALUES (?, ?)", [user.email, passwordHash], (err, line) => {
+  connexion.query("INSERT INTO user (email, password, role_id) VALUES (?, ?, 1)", [user.email, passwordHash], (err, line) => {
     if (err && err.code == "ER_DUP_ENTRY") {
       return res.sendStatus(409); // Conflit
     }
@@ -98,26 +102,43 @@ app.post("/inscription", (req, res) => {
 });
 
 app.post("/connexion", (req, res) => {
-  connexion.query("SELECT * FROM user WHERE email = ?", [req.body.email], (err, line) => {
-    if (err) {
-      console.log(err);
-      return res.sendStatus(500);
+  connexion.query(
+    `
+    SELECT u.id, u.email, u.password, r.name
+    FROM user u 
+    JOIN role r ON u.role_id = r.id 
+    WHERE email = ?
+    `,
+    [req.body.email],
+    (err, line) => {
+      if (err) {
+        console.log(err);
+        return res.sendStatus(500);
+      }
+
+      if (line.length === 0) {
+        return res.sendStatus(401);
+      }
+
+      const formPassword = req.body.password;
+      const fetchPassword = line[0].password;
+
+      const compatible = bcrypt.compareSync(formPassword, fetchPassword);
+
+      if (!compatible) {
+        return res.sendStatus(401);
+      }
+      return res.send(
+        jwtUtils.sign(
+          {
+            sub: req.body.email,
+            role: line[0].name,
+          },
+          "azerty123"
+        )
+      );
     }
-
-    if (line.length === 0) {
-      return res.sendStatus(401);
-    }
-
-    const formPassword = req.body.password;
-    const fetchPassword = line[0].password;
-
-    const compatible = bcrypt.compareSync(formPassword, fetchPassword);
-
-    if (!compatible) {
-      return res.sendStatus(401);
-    }
-    return res.send(jwtUtils.sign({ sub: req.body.email }, "azerty123"));
-  });
+  );
 });
 
 app.listen(5000, () => {

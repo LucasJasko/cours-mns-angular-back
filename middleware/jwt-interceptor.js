@@ -10,6 +10,13 @@ function intercept(req, res, next) {
 
       return res.sendStatus(401);
     }
+
+    const jwtParts = token.split(".");
+    const jwtBodyBase64 = jwtParts[1];
+    const jwtBodyDecoded = atob(jwtBodyBase64); // Decode la base 64
+    const body = JSON.parse(jwtBodyDecoded);
+
+    req.user = body;
   } catch (e) {
     //  cas où le format du jwt est invalide
     console.log("Format invalide");
