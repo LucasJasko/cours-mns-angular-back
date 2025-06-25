@@ -50,18 +50,18 @@ app.post("/product", interceptor, (req, res) => {
     return res.sendStatus(403);
   }
 
-  if (product.nom == null || product.nom == "" || product.nom.length > 20 || product.description.length > 50) {
+  if (product.name == null || product.nom == "" || product.name.length > 20 || product.description.length > 50) {
     // Validation
     return res.sendStatus(400); // Bad request
   }
 
   // Verification si le nom du produit existe déjà
-  connexion.query("SELECT * FROM product WHERE name = ?", [product.nom], (err, line) => {
+  connexion.query("SELECT * FROM product WHERE name = ?", [product.name], (err, line) => {
     if (line.length > 0) {
       return res.sendStatus(409); // Conflict
     }
 
-    connexion.query("INSERT INTO product (name, description, id_creator) VALUES (?, ?, ?)", [product.nom, product.description, req.user.id], (err, line) => {
+    connexion.query("INSERT INTO product (name, description, id_creator) VALUES (?, ?, ?)", [product.name, product.description, req.user.id], (err, line) => {
       if (err) {
         console.log(err);
         return res.sendStatus(500); // Internal Server error
@@ -81,6 +81,47 @@ app.get("/product/list", (req, response) => {
     }
 
     return response.json(item);
+  });
+});
+
+app.put("/product/:id", interceptor, (req, res) => {
+  const product = req.body;
+  product.id = req.params.id;
+
+  if (req.user.role != "vendeur" && req.user.role != "administrateur") {
+    return res.sendStatus(403);
+  }
+
+  if (product.name == null || product.name == "" || product.name.length > 20 || product.description.length > 50) {
+    return res.sendStatus(400);
+  }
+
+  connexion.query("SELECT * FROM product WHERE name = ? AND id != ?", [product.name, product.id], (err, lines) => {
+    if (lines.length > 0) {
+      return res.sendStatus(409);
+    }
+
+    connexion.query("UPDATE product SET name = ?, description = ? WHERE id = ?", [product.name, product.description, product.id], (err, line) => {
+      if (err) {
+        console.log(err);
+        return res.sendStatus(500); // Internal Server error
+      }
+      return res.status(200).json(product); // Ok
+    });
+  });
+});
+
+app.get("/product/:id", interceptor, (req, res) => {
+  connexion.query("SELECT * FROM product WHERE id = ?", [req.params.id], (err, lines) => {
+    if (err) {
+      console.error(err);
+      return res.sendStatus(500);
+    }
+    if (lines.length == 0) {
+      return res.sendStatus(404);
+    }
+
+    return res.json(lines[0]);
   });
 });
 
